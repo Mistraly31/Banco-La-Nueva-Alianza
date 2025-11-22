@@ -138,7 +138,7 @@ function handleTransfer(event) {
     const recipient = document.getElementById('recipient').value;
     const amount = parseFloat(document.getElementById('amount').value);
     
-    // Verificación local (puede ser saltada, pero es una primera barrera)
+    // Verificación 1: Restricción de Envío y Saldo (Local)
     if (!userData || userData.canSend === false) {
         showMessage("Error: No puedes enviar dinero desde esta cuenta.", 'error');
         return;
@@ -147,32 +147,35 @@ function handleTransfer(event) {
         showMessage("Error: Saldo insuficiente localmente.", 'error');
         return;
     }
+    
+    // **NUEVA VERIFICACIÓN:** Evitar transferencia a uno mismo (soluciona el error de permisos)
+    if (userData.username === recipient) {
+        showMessage("Error: No puedes transferir dinero a tu propia cuenta.", 'error');
+        return;
+    }
 
-    // Paso 1: Buscar el documento del destinatario por el nombre de usuario
+    // Paso 1: Buscar el documento del destinatario
     db.collection('accounts').where('username', '==', recipient).get()
     .then(snapshot => {
         if (snapshot.empty) {
+            // **CORRECCIÓN 1:** Si no existe, muestra el mensaje y finaliza correctamente.
             showMessage("Error: Cuenta destinataria no existe.", 'error');
-            return;
+            return; // Devuelve nada para que la siguiente cadena de .then no se ejecute
         }
 
         const recipientDoc = snapshot.docs[0];
-        const recipientRef = recipientDoc.ref; // Referencia al documento del destinatario
-        const senderRef = db.collection('accounts').doc(currentUserId); // Referencia al emisor
+        const recipientRef = recipientDoc.ref;
+        const senderRef = db.collection('accounts').doc(currentUserId); 
 
         // -----------------------------------------------------------------
-        // **INICIO DE LA TRANSACCIÓN (Patrón Atómico)**
+        // **INICIO DE LA TRANSACCIÓN**
         // -----------------------------------------------------------------
         return db.runTransaction(transaction => {
             
-            // 1. Obtener los últimos datos del EMISOR (requerido para la transacción)
             return transaction.get(senderRef).then(senderDoc => {
                 const senderBalance = senderDoc.data().balance;
 
-                // 2. VERIFICACIÓN DE SALDO EN LA TRANSACCIÓN (Doble seguridad)
                 if (senderBalance < amount) {
-                    // Si el saldo no es suficiente, la transacción se cancela.
-                    // Esto protege contra carreras de datos.
                     throw "Error de Saldo Insuficiente"; 
                 }
 
@@ -181,7 +184,6 @@ function handleTransfer(event) {
                 transaction.update(senderRef, { balance: newSenderBalance });
 
                 // 4. EJECUTAR CRÉDITO (Sumar al receptor)
-                // Usamos FieldValue.increment para que el crédito se sume correctamente.
                 transaction.update(recipientRef, { 
                     balance: firebase.firestore.FieldValue.increment(amount) 
                 });
@@ -189,14 +191,16 @@ function handleTransfer(event) {
         });
     })
     .then(() => {
-        // La transacción fue exitosa
+        // Esta parte solo se ejecuta si la promesa anterior fue exitosa (incluyendo la Transacción)
         showMessage(`Transferencia exitosa de ${amount.toFixed(2)}€ a ${recipient}.`, 'success');
     })
     .catch(error => {
-        // Manejar errores de saldo, de reglas o de la base de datos
+        // Manejo de errores de la Transacción o de la búsqueda inicial
         console.error("Error durante la transferencia:", error);
         if (typeof error === 'string' && error.includes('Saldo')) {
-            showMessage(`Error: ${error}`, 'error');
+            showMessage(`Error: Saldo insuficiente.`, 'error');
+        } else if (error.code && error.code === 'permission-denied') {
+            showMessage("Error: Permiso denegado por reglas de seguridad. (Intento de transferencia inválida).", 'error');
         } else {
             showMessage("Error: Transacción fallida. Revisa la consola.", 'error');
         }
