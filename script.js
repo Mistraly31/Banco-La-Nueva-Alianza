@@ -73,7 +73,7 @@ function showBankScreen(username) {
     // Formatear el saldo como dinero (ej: 1,500.50 € o $)
     const formattedBalance = userData.balance.toLocaleString('es-ES', { 
         style: 'currency', 
-        currency: 'EUR' // Puedes cambiar 'EUR' a 'USD' o el que desees
+        currency: 'USD' // Puedes cambiar 'EUR' a 'USD' o el que desees
     });
     accountBalance.textContent = formattedBalance;
 }
