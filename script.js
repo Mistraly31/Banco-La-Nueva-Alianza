@@ -138,17 +138,17 @@ function handleTransfer(event) {
     const recipient = document.getElementById('recipient').value;
     const amount = parseFloat(document.getElementById('amount').value);
     
-    // 1. Verificación de Restricción de Envío y Saldo (Aún se puede manipular)
-    if (!userData.canSend) {
+    // Verificación local (puede ser saltada, pero es una primera barrera)
+    if (!userData || userData.canSend === false) {
         showMessage("Error: No puedes enviar dinero desde esta cuenta.", 'error');
         return;
     }
     if (userData.balance < amount) {
-        showMessage("Error: Saldo insuficiente.", 'error');
+        showMessage("Error: Saldo insuficiente localmente.", 'error');
         return;
     }
-    
-    // **Paso 1: Buscar el ID del receptor**
+
+    // Paso 1: Buscar el documento del destinatario por el nombre de usuario
     db.collection('accounts').where('username', '==', recipient).get()
     .then(snapshot => {
         if (snapshot.empty) {
@@ -157,32 +157,49 @@ function handleTransfer(event) {
         }
 
         const recipientDoc = snapshot.docs[0];
-        const recipientId = recipientDoc.id;
+        const recipientRef = recipientDoc.ref; // Referencia al documento del destinatario
+        const senderRef = db.collection('accounts').doc(currentUserId); // Referencia al emisor
 
-        // **Paso 2: DÉBITO (Actualizar el saldo del emisor)**
-        // Esto depende de la Regla de Seguridad de Firestore.
-        db.collection('accounts').doc(currentUserId).update({
-            balance: firebase.firestore.FieldValue.increment(-amount)
-        })
-        .then(() => {
-            // **Paso 3: CRÉDITO (Actualizar el saldo del receptor)**
-            // ¡Esto podría fallar y dejar el débito sin el crédito! (INSEGURO)
-            return db.collection('accounts').doc(recipientId).update({
-                balance: firebase.firestore.FieldValue.increment(amount)
+        // -----------------------------------------------------------------
+        // **INICIO DE LA TRANSACCIÓN (Patrón Atómico)**
+        // -----------------------------------------------------------------
+        return db.runTransaction(transaction => {
+            
+            // 1. Obtener los últimos datos del EMISOR (requerido para la transacción)
+            return transaction.get(senderRef).then(senderDoc => {
+                const senderBalance = senderDoc.data().balance;
+
+                // 2. VERIFICACIÓN DE SALDO EN LA TRANSACCIÓN (Doble seguridad)
+                if (senderBalance < amount) {
+                    // Si el saldo no es suficiente, la transacción se cancela.
+                    // Esto protege contra carreras de datos.
+                    throw "Error de Saldo Insuficiente"; 
+                }
+
+                // 3. EJECUTAR DÉBITO (Restar al emisor)
+                const newSenderBalance = senderBalance - amount;
+                transaction.update(senderRef, { balance: newSenderBalance });
+
+                // 4. EJECUTAR CRÉDITO (Sumar al receptor)
+                // Usamos FieldValue.increment para que el crédito se sume correctamente.
+                transaction.update(recipientRef, { 
+                    balance: firebase.firestore.FieldValue.increment(amount) 
+                });
             });
-        })
-        .then(() => {
-            // El saldo del emisor se actualizará automáticamente gracias a onSnapshot
-            showMessage(`Transferencia exitosa de ${amount.toFixed(2)}€ a ${recipient}.`, 'success');
-        })
-        .catch(error => {
-            console.error("Error durante la transferencia:", error);
-            showMessage("Error crítico en la transacción. ¡Revisa la consola!", 'error');
         });
-
+    })
+    .then(() => {
+        // La transacción fue exitosa
+        showMessage(`Transferencia exitosa de ${amount.toFixed(2)}€ a ${recipient}.`, 'success');
     })
     .catch(error => {
-        console.error("Error al buscar destinatario:", error);
+        // Manejar errores de saldo, de reglas o de la base de datos
+        console.error("Error durante la transferencia:", error);
+        if (typeof error === 'string' && error.includes('Saldo')) {
+            showMessage(`Error: ${error}`, 'error');
+        } else {
+            showMessage("Error: Transacción fallida. Revisa la consola.", 'error');
+        }
     });
 
     transferForm.reset();
