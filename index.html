@@ -25,9 +25,19 @@
         </header>
 
         <main class="center-content">
-            <p class="balance-label">CURRENT BALANCE</p>
+            <p class="balance-label">Current Balance</p>
             <div id="account-balance" class="balance-display"></div>
-        </main>
+
+            <div id="transfer-section">
+                <h3>Realizar Transferencia</h3>
+                <form id="transfer-form">
+                    <input type="text" id="recipient" placeholder="Cuenta Destinataria" required>
+                    <input type="number" id="amount" placeholder="Cantidad" required min="0.01" step="0.01">
+                    <button type="submit" id="transfer-button">TRANSFERIR</button>
+                    <p id="transfer-message" class="hidden"></p>
+                </form>
+            </div>
+            </main>
     </div>
 
     <div id="error-message" class="hidden center-content">
