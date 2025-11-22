@@ -8,30 +8,23 @@
 // 🎯 Zona de Configuración - ¡Modifica aquí los Usuarios!
 // ==========================================================
 
-const userAccounts = {
-    // Usuario Normal (puede enviar)
-    "Usuario1": { 
-        password: "Contraseña1",
-        balance: 1500.50,
-        group: "Normal",     // Clasificación por grupo
-        canSend: true        // Permite enviar dinero
-    },
-    // Usuario Premium (puede enviar)
-    "Usuario2": { 
-        password: "password2024",
-        balance: 45000.75,
-        group: "Premium",
-        canSend: true
-    },
-    // Cuenta del Sistema/Reservas (NO puede enviar dinero)
-    "Reserva": { 
-        password: "none", // Contraseña ficticia, no debería usarse
-        balance: 999999.00,
-        group: "Sistema",
-        canSend: false       // <--- Cuenta con restricción de envío
-    },
-    // Añade más usuarios aquí...
+// === 1. Configuración de Firebase y Autenticación ===
+// Asegúrate de importar los SDKs en index.html: firebase-app.js, firebase-firestore.js, firebase-auth.js
+const firebaseConfig = {
+    // PEGA AQUÍ TU CONFIGURACIÓN
 };
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+const auth = firebase.auth(); 
+// === 2. ¡ELIMINA EL OBJETO userAccounts! (Ahora viene de Firestore) ===
+
+// Referencias del DOM
+const loginContainer = document.getElementById('login-container');
+// ... otras referencias ...
+
+let currentUserId = null; // Guardará el ID de Firestore (userId)
+let userData = null; // Guardará los datos del usuario logueado
 
 // ... el resto de la lógica JS ...
 
@@ -77,47 +70,59 @@ function showMessage(text, type) {
     }, 3000);
 }
 
-// Función que maneja el envío de dinero
 function handleTransfer(event) {
     event.preventDefault();
 
     const recipient = document.getElementById('recipient').value;
     const amount = parseFloat(document.getElementById('amount').value);
-    const sender = loggedInUser;
-    const senderData = userAccounts[sender];
-
-    // 1. **VERIFICACIÓN DE RESTRICCIÓN DE ENVÍO**
-    if (!senderData.canSend) {
-        showMessage("Error: No puedes enviar dinero desde esta cuenta (Restricción de envío).", 'error');
+    
+    // 1. Verificación de Restricción de Envío y Saldo (Aún se puede manipular)
+    if (!userData.canSend) {
+        showMessage("Error: No puedes enviar dinero desde esta cuenta.", 'error');
         return;
     }
-
-    // 2. Verificaciones básicas
-    if (!userAccounts[recipient]) {
-        showMessage("Error: Cuenta destinataria no existe.", 'error');
-        return;
-    }
-
-    if (amount <= 0 || isNaN(amount)) {
-        showMessage("Error: Cantidad inválida.", 'error');
-        return;
-    }
-
-    if (senderData.balance < amount) {
+    if (userData.balance < amount) {
         showMessage("Error: Saldo insuficiente.", 'error');
         return;
     }
     
-    // 3. **EJECUCIÓN DE LA TRANSFERENCIA SIMULADA**
-    // Restamos al emisor y sumamos al receptor.
-    senderData.balance -= amount;
-    userAccounts[recipient].balance += amount;
+    // **Paso 1: Buscar el ID del receptor**
+    db.collection('accounts').where('username', '==', recipient).get()
+    .then(snapshot => {
+        if (snapshot.empty) {
+            showMessage("Error: Cuenta destinataria no existe.", 'error');
+            return;
+        }
 
-    // 4. Actualizar la interfaz del emisor
-    updateBalanceUI(sender);
-    showMessage(`Transferencia exitosa de ${amount.toFixed(2)}€ a ${recipient}.`, 'success');
-    
-    // Limpiar formulario
+        const recipientDoc = snapshot.docs[0];
+        const recipientId = recipientDoc.id;
+        const recipientData = recipientDoc.data();
+
+        // **Paso 2: DÉBITO (Actualizar el saldo del emisor)**
+        // Esto depende de la Regla de Seguridad de Firestore.
+        db.collection('accounts').doc(currentUserId).update({
+            balance: firebase.firestore.FieldValue.increment(-amount)
+        })
+        .then(() => {
+            // **Paso 3: CRÉDITO (Actualizar el saldo del receptor)**
+            // ¡Esto podría fallar y dejar el débito sin el crédito! (INSEGURO)
+            return db.collection('accounts').doc(recipientId).update({
+                balance: firebase.firestore.FieldValue.increment(amount)
+            });
+        })
+        .then(() => {
+            showMessage(`Transferencia exitosa de ${amount.toFixed(2)}€ a ${recipient}.`, 'success');
+        })
+        .catch(error => {
+            console.error("Error durante la transferencia:", error);
+            showMessage("Error crítico en la transacción. ¡Revisa la consola!", 'error');
+        });
+
+    })
+    .catch(error => {
+        console.error("Error al buscar destinatario:", error);
+    });
+
     transferForm.reset();
 }
 
@@ -181,32 +186,69 @@ function showBankScreen(username) {
     accountBalance.textContent = formattedBalance;
 }
 
-// Función para manejar el intento de inicio de sesión
 function handleLogin(event) {
-    // Previene que el formulario se envíe de forma tradicional y recargue la página
     event.preventDefault(); 
 
     const usernameInput = document.getElementById('username').value;
     const passwordInput = document.getElementById('password').value;
 
-    // Verificar si el usuario existe en nuestro objeto de cuentas
-    if (userAccounts[usernameInput]) {
-        // Verificar si la contraseña coincide
-        if (userAccounts[usernameInput].password === passwordInput) {
-            // Éxito en el login
-            loggedInUser = usernameInput;
-            showBankScreen(loggedInUser);
+    // **Paso 1: Simulación de Búsqueda de Usuario y Contraseña**
+    // DEBERÍAS USAR firebase.auth().signInWithEmailAndPassword().
+    // Aquí simularemos el login buscando el nombre de usuario directamente en Firestore.
+
+    db.collection('accounts').where('username', '==', usernameInput).get()
+    .then(snapshot => {
+        if (snapshot.empty) {
+            showLoginFailed();
+            return;
+        }
+        
+        const doc = snapshot.docs[0];
+        const account = doc.data();
+
+        // **Paso 2: Verificación de Contraseña (Aún inseguro)**
+        if (account.password === passwordInput) {
+            currentUserId = doc.id; // ¡Guardamos el ID de Firestore!
+            
+            // **Paso 3: Escuchar cambios en tiempo real (Persistencia)**
+            db.collection('accounts').doc(currentUserId)
+              .onSnapshot(docSnapshot => {
+                // Se ejecuta cada vez que el saldo cambia en la base de datos
+                userData = docSnapshot.data();
+                showBankScreen(userData.username);
+                updateBalanceUI();
+              }, error => {
+                console.error("Error al escuchar cambios:", error);
+              });
+
         } else {
-            // Contraseña incorrecta
             showLoginFailed();
         }
-    } else {
-        // Usuario no encontrado
+    })
+    .catch(error => {
+        console.error("Error al iniciar sesión:", error);
         showLoginFailed();
-    }
+    });
 
-    // Limpiar los campos del formulario
     loginForm.reset();
+}
+
+// Actualización de la UI basada en el objeto userData (que se actualiza en tiempo real)
+function updateBalanceUI() {
+    if (userData) {
+        const formattedBalance = userData.balance.toLocaleString('es-ES', { 
+            style: 'currency', 
+            currency: 'EUR'
+        });
+        accountBalance.textContent = formattedBalance;
+    }
+}
+
+function showBankScreen(username) {
+    loginContainer.classList.add('hidden');
+    bankContainer.classList.remove('hidden');
+    displayUsername.textContent = `Bienvenido, ${username} [Grupo: ${userData.group}]`;
+    updateBalanceUI();
 }
 
 // Función para manejar el cierre de sesión (Logout)
