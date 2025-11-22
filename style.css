@@ -1,0 +1,134 @@
+/* Configuraciones base: fondo negro, texto blanco, fuente Roboto */
+body {
+    background-color: #000; /* Fondo completamente negro */
+    color: #fff; /* Letras blancas */
+    font-family: 'Roboto', sans-serif; /* Fuente Roboto */
+    font-size: 11pt; /* Tamaño de fuente 11pt */
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex; /* Usamos flexbox para centrar contenido */
+    flex-direction: column;
+}
+
+/* Clase para centrar el contenido en la pantalla */
+.center-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* Estilo para los contenedores que deben estar ocultos */
+.hidden {
+    display: none !important;
+}
+
+/* --- Estilos del Formulario de Login --- */
+
+#login-container h1 {
+    font-size: 24pt;
+    margin-bottom: 30px;
+}
+
+#login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* Espacio entre los campos de texto y el botón */
+    width: 300px;
+}
+
+input[type="text"], input[type="password"] {
+    background-color: #1a1a1a; /* Fondo oscuro para los inputs */
+    color: #fff;
+    border: 1px solid #444; /* Borde sutil */
+    padding: 10px;
+    font-size: 11pt;
+    font-family: 'Roboto', sans-serif;
+    outline: none; /* Quitar el borde de enfoque por defecto */
+}
+
+input::placeholder {
+    color: #aaa; /* Color de las letras de placeholder */
+}
+
+#login-button {
+    background-color: #333; /* Fondo para el botón */
+    color: #fff;
+    border: none;
+    padding: 12px;
+    font-size: 12pt;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+#login-button:hover {
+    background-color: #555; /* Efecto hover para el botón */
+}
+
+/* --- Estilos de la Pantalla del Banco --- */
+
+#bank-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    justify-content: space-between; /* Alinea el nombre a la izquierda y el botón a la derecha */
+    align-items: center;
+    width: 100%;
+    padding: 20px;
+    box-sizing: border-box; /* Incluye padding en el ancho */
+}
+
+.username-display {
+    font-weight: 700;
+}
+
+#logout-button {
+    background-color: #333;
+    color: #fff;
+    border: none;
+    padding: 8px 15px;
+    font-size: 11pt;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#logout-button:hover {
+    background-color: #555;
+}
+
+/* Estilo para el saldo en el centro */
+.balance-label {
+    font-size: 14pt;
+    margin-bottom: 5px;
+}
+
+.balance-display {
+    font-size: 72pt; /* Dinero en grande en el centro */
+    font-weight: 700;
+    text-align: center;
+}
+
+/* --- Estilo del Mensaje de Error (Login Failed) --- */
+
+#error-message {
+    position: fixed; /* Para que ocupe toda la pantalla y tape todo */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+}
+
+.error-text {
+    color: #fff;
+    font-size: 36pt;
+}
