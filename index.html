@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banco</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="login-container" class="center-content">
+        <h1>Banco</h1>
+        <form id="login-form">
+            <input type="text" id="username" placeholder="Nombre de Usuario" required>
+            <input type="password" id="password" placeholder="Contraseña" required>
+            <button type="submit" id="login-button">INICIAR SESIÓN</button>
+        </form>
+    </div>
+
+    <div id="bank-container" class="hidden">
+        <header>
+            <span id="display-username" class="username-display"></span>
+            <button id="logout-button">LOGOUT</button>
+        </header>
+
+        <main class="center-content">
+            <p class="balance-label">SALDO ACTUAL</p>
+            <div id="account-balance" class="balance-display"></div>
+        </main>
+    </div>
+
+    <div id="error-message" class="hidden center-content">
+        <h1 class="error-text">LOGIN FAILED</h1>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
